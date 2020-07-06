@@ -186,36 +186,13 @@ final class WebRTCClient: NSObject {
         self.videoCapturer = RTCFileVideoCapturer(delegate: videoSource)
         #else
         self.videoCapturer = RTCCameraVideoCapturer(delegate: self)
-//        //下記を設定して、capture:didCaptureVideoFrameを加工
-//        self.videoCapturer?.delegate = self
         #endif
         
         let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource, trackId: "video0")
         return videoTrack
     }
 
-    private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer) {
-//        func cvPixelBuffer(image: UIImage) -> CVPixelBuffer? {
-//            let width = image.cgImage!.width
-//            let height = image.cgImage!.height
-//
-//            var pixelBuffer: CVPixelBuffer? = nil
-//            let options: [NSObject: Any] = [
-//                kCVPixelBufferCGImageCompatibilityKey: false,
-//                kCVPixelBufferCGBitmapContextCompatibilityKey: false,
-//                ]
-//            _ = CVPixelBufferCreate(kCFAllocatorDefault, Int(width), Int(height), kCVPixelFormatType_32BGRA, options as CFDictionary, &pixelBuffer)
-//            CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
-//            let pixelData = CVPixelBufferGetBaseAddress(pixelBuffer!)
-//            let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
-//            guard let context = CGContext(data: pixelData, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer!), space: rgbColorSpace, bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue) else {
-//                                            fatalError()
-//            }
-//            context.draw(image.cgImage!, in: CGRect(origin: .zero, size: CGSize.init(width: width, height: height)))
-//            CVPixelBufferUnlockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
-//            return pixelBuffer
-//        }
-
+    private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer, srcframe: RTCVideoFrame) {
         func cvPixelBuffer(image: UIImage) -> CVPixelBuffer?
         {
             let width = image.cgImage!.width
@@ -244,9 +221,6 @@ final class WebRTCClient: NSObject {
                                            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue) else {
                     fatalError()
             }
-            // TODO: 必要なかったら削除
-            context.concatenate(CGAffineTransform.identity)
-
             context.draw(image.cgImage!, in: CGRect(origin: .zero, size: CGSize.init(width: width, height: height)))
             CVPixelBufferUnlockBaseAddress(pxbuffer, CVPixelBufferLockFlags(rawValue: 0))
 
@@ -268,7 +242,7 @@ final class WebRTCClient: NSObject {
         let videoFrame = RTCVideoFrame(
             buffer: rtcpixelBuffer,
             rotation: RTCVideoRotation._0,
-            timeStampNs: Int64(Date().timeIntervalSince1970 * 1_000)
+            timeStampNs: srcframe.timeStampNs
         )
         videoSource.capturer(videoCapturer, didCapture: videoFrame)
     }
@@ -395,7 +369,7 @@ extension WebRTCClient: RTCDataChannelDelegate {
 
 extension WebRTCClient: RTCVideoCapturerDelegate {
     func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) {
-        //self.videoSource.capturer(capturer, didCapture: frame)
-        self.captureVideoFrameChannel(videoSource: self.videoSource, videoCapturer: capturer)
+//        self.videoSource.capturer(capturer, didCapture: frame)
+        self.captureVideoFrameChannel(videoSource: self.videoSource, videoCapturer: capturer, srcframe: frame)
     }
 }
