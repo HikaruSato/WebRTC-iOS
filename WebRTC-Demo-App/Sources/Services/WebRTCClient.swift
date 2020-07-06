@@ -38,6 +38,8 @@ final class WebRTCClient: NSObject {
     private var localDataChannel: RTCDataChannel?
     private var remoteDataChannel: RTCDataChannel?
 
+    private var videoSource: RTCVideoSource!
+
     // customize
     //private var videoFrameCapturer: RTCVideoCapturer?
     private var videoFrame: RTCVideoFrame?
@@ -132,7 +134,6 @@ final class WebRTCClient: NSObject {
                               fps: Int(fps.maxFrameRate))
         
         self.localVideoTrack?.add(renderer)
-        //self.captureVideoFrameChannel(videoCapturer: capturer)
     }
 
     
@@ -179,19 +180,21 @@ final class WebRTCClient: NSObject {
     }
     
     private func createVideoTrack() -> RTCVideoTrack {
-        let videoSource = WebRTCClient.factory.videoSource()
+        self.videoSource = WebRTCClient.factory.videoSource()
         
         #if TARGET_OS_SIMULATOR
         self.videoCapturer = RTCFileVideoCapturer(delegate: videoSource)
         #else
-        self.videoCapturer = RTCCameraVideoCapturer(delegate: videoSource)
+        self.videoCapturer = RTCCameraVideoCapturer(delegate: self)
+//        //下記を設定して、capture:didCaptureVideoFrameを加工
+//        self.videoCapturer?.delegate = self
         #endif
         
         let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource, trackId: "video0")
         return videoTrack
     }
 
-    private func captureVideoFrameChannel(videoCapturer: RTCVideoCapturer) {
+    private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer) {
 //        func cvPixelBuffer(image: UIImage) -> CVPixelBuffer? {
 //            let width = image.cgImage!.width
 //            let height = image.cgImage!.height
@@ -262,13 +265,12 @@ final class WebRTCClient: NSObject {
 
         let pixelBuffer = CMSampleBufferGetImageBuffer(cmSampleBuffer(image: image))!
         let rtcpixelBuffer = RTCCVPixelBuffer(pixelBuffer: pixelBuffer)
-        self.videoFrame = RTCVideoFrame(
+        let videoFrame = RTCVideoFrame(
             buffer: rtcpixelBuffer,
             rotation: RTCVideoRotation._0,
             timeStampNs: Int64(Date().timeIntervalSince1970 * 1_000)
         )
-        let videoSource = WebRTCClient.factory.videoSource()
-        videoSource.capturer(videoCapturer, didCapture: videoFrame!)
+        videoSource.capturer(videoCapturer, didCapture: videoFrame)
     }
     
     // MARK: Data Channels
@@ -388,5 +390,12 @@ extension WebRTCClient: RTCDataChannelDelegate {
     
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         self.delegate?.webRTCClient(self, didReceiveData: buffer.data)
+    }
+}
+
+extension WebRTCClient: RTCVideoCapturerDelegate {
+    func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) {
+        //self.videoSource.capturer(capturer, didCapture: frame)
+        self.captureVideoFrameChannel(videoSource: self.videoSource, videoCapturer: capturer)
     }
 }
