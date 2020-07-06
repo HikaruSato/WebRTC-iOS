@@ -38,6 +38,12 @@ final class WebRTCClient: NSObject {
     private var localDataChannel: RTCDataChannel?
     private var remoteDataChannel: RTCDataChannel?
 
+    // customize
+    //private var videoFrameCapturer: RTCVideoCapturer?
+    private var videoFrame: RTCVideoFrame?
+
+    private let image = UIImage(named: "gundam")!
+
     @available(*, unavailable)
     override init() {
         fatalError("WebRTCClient:init is unavailable")
@@ -126,7 +132,9 @@ final class WebRTCClient: NSObject {
                               fps: Int(fps.maxFrameRate))
         
         self.localVideoTrack?.add(renderer)
+        //self.captureVideoFrameChannel(videoCapturer: capturer)
     }
+
     
     func renderRemoteVideo(to renderer: RTCVideoRenderer) {
         self.remoteVideoTrack?.add(renderer)
@@ -181,6 +189,86 @@ final class WebRTCClient: NSObject {
         
         let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource, trackId: "video0")
         return videoTrack
+    }
+
+    private func captureVideoFrameChannel(videoCapturer: RTCVideoCapturer) {
+//        func cvPixelBuffer(image: UIImage) -> CVPixelBuffer? {
+//            let width = image.cgImage!.width
+//            let height = image.cgImage!.height
+//
+//            var pixelBuffer: CVPixelBuffer? = nil
+//            let options: [NSObject: Any] = [
+//                kCVPixelBufferCGImageCompatibilityKey: false,
+//                kCVPixelBufferCGBitmapContextCompatibilityKey: false,
+//                ]
+//            _ = CVPixelBufferCreate(kCFAllocatorDefault, Int(width), Int(height), kCVPixelFormatType_32BGRA, options as CFDictionary, &pixelBuffer)
+//            CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+//            let pixelData = CVPixelBufferGetBaseAddress(pixelBuffer!)
+//            let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
+//            guard let context = CGContext(data: pixelData, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer!), space: rgbColorSpace, bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue) else {
+//                                            fatalError()
+//            }
+//            context.draw(image.cgImage!, in: CGRect(origin: .zero, size: CGSize.init(width: width, height: height)))
+//            CVPixelBufferUnlockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+//            return pixelBuffer
+//        }
+
+        func cvPixelBuffer(image: UIImage) -> CVPixelBuffer?
+        {
+            let width = image.cgImage!.width
+            let height = image.cgImage!.height
+            let options: [NSObject: Any] = [
+                            kCVPixelBufferCGImageCompatibilityKey: true,
+                            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+                            ]
+            var pxbufferTemp: CVPixelBuffer? = nil
+            let status = CVPixelBufferCreate(kCFAllocatorDefault, width,
+                                             height, kCVPixelFormatType_32ARGB, options as CFDictionary,
+                &pxbufferTemp);
+            guard let pxbuffer = pxbufferTemp, status == kCVReturnSuccess else {
+                fatalError()
+            }
+
+            CVPixelBufferLockBaseAddress(pxbuffer, [])
+            let pxdataTmp = CVPixelBufferGetBaseAddress(pxbuffer)
+            guard let pxdata = pxdataTmp else {
+                fatalError()
+            }
+
+            let rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+            guard let  context = CGContext(data: pxdata, width: width,
+                                           height: height, bitsPerComponent: 8, bytesPerRow: 4 * width, space: rgbColorSpace,
+                                           bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue) else {
+                    fatalError()
+            }
+            // TODO: 必要なかったら削除
+            context.concatenate(CGAffineTransform.identity)
+
+            context.draw(image.cgImage!, in: CGRect(origin: .zero, size: CGSize.init(width: width, height: height)))
+            CVPixelBufferUnlockBaseAddress(pxbuffer, CVPixelBufferLockFlags(rawValue: 0))
+
+            return pxbuffer
+        }
+
+        func cmSampleBuffer(image: UIImage) -> CMSampleBuffer {
+            let pixelBuffer = cvPixelBuffer(image: image)
+            var newSampleBuffer: CMSampleBuffer? = nil
+            var timimgInfo: CMSampleTimingInfo = CMSampleTimingInfo.invalid
+            var videoInfo: CMVideoFormatDescription? = nil
+            CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixelBuffer!, formatDescriptionOut: &videoInfo)
+            CMSampleBufferCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: pixelBuffer!, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: videoInfo!, sampleTiming: &timimgInfo, sampleBufferOut: &newSampleBuffer)
+            return newSampleBuffer!
+        }
+
+        let pixelBuffer = CMSampleBufferGetImageBuffer(cmSampleBuffer(image: image))!
+        let rtcpixelBuffer = RTCCVPixelBuffer(pixelBuffer: pixelBuffer)
+        self.videoFrame = RTCVideoFrame(
+            buffer: rtcpixelBuffer,
+            rotation: RTCVideoRotation._0,
+            timeStampNs: Int64(Date().timeIntervalSince1970 * 1_000)
+        )
+        let videoSource = WebRTCClient.factory.videoSource()
+        videoSource.capturer(videoCapturer, didCapture: videoFrame!)
     }
     
     // MARK: Data Channels
