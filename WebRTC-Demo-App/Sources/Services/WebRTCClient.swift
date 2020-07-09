@@ -44,8 +44,6 @@ final class WebRTCClient: NSObject {
     //private var videoFrameCapturer: RTCVideoCapturer?
     private var videoFrame: RTCVideoFrame?
 
-    private let image = UIImage(named: "gundam")!
-
     @available(*, unavailable)
     override init() {
         fatalError("WebRTCClient:init is unavailable")
@@ -194,6 +192,8 @@ final class WebRTCClient: NSObject {
 
     /// 画像を映像フレームに送信
     private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer) {
+        let image = UIImage(named: "gundam")!
+
         func cvPixelBuffer(image: UIImage) -> CVPixelBuffer?
         {
             let width = image.cgImage!.width
