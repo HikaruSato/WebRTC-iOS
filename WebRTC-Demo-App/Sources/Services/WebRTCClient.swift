@@ -192,7 +192,8 @@ final class WebRTCClient: NSObject {
         return videoTrack
     }
 
-    private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer, srcframe: RTCVideoFrame) {
+    /// 画像を映像フレームに送信
+    private func captureVideoFrameChannel(videoSource: RTCVideoSource, videoCapturer: RTCVideoCapturer) {
         func cvPixelBuffer(image: UIImage) -> CVPixelBuffer?
         {
             let width = image.cgImage!.width
@@ -242,7 +243,7 @@ final class WebRTCClient: NSObject {
         let videoFrame = RTCVideoFrame(
             buffer: rtcpixelBuffer,
             rotation: RTCVideoRotation._0,
-            timeStampNs: srcframe.timeStampNs
+            timeStampNs: Int64(Date().timeIntervalSince1970 * 1_000_000_000)
         )
         videoSource.capturer(videoCapturer, didCapture: videoFrame)
     }
@@ -369,7 +370,7 @@ extension WebRTCClient: RTCDataChannelDelegate {
 
 extension WebRTCClient: RTCVideoCapturerDelegate {
     func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) {
-//        self.videoSource.capturer(capturer, didCapture: frame)
-        self.captureVideoFrameChannel(videoSource: self.videoSource, videoCapturer: capturer, srcframe: frame)
+        //self.videoSource.capturer(capturer, didCapture: frame)
+        self.captureVideoFrameChannel(videoSource: self.videoSource, videoCapturer: capturer)
     }
 }
